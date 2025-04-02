@@ -95,19 +95,16 @@ def process_audio(filename):
 
     # Generate response
     response = model.generate_content(contents)
-    
 
     # Save conversation to history
     if isinstance(response.text, str):
         #print(response.text)
-        json_part = response.text.replace("```json\n", "").replace("```", "").replace("[", "").replace("]", "").replace("\n", "").replace('"', "")
-        print(json_part)
+        json_part =  json.loads(response.text.replace("```json\n", "").replace("```", ""))
+        #print(json_part)
     try:
-        response_array = json_part.split(',')
-        print(response_array)
-        chat_history.append({"role": "user", "parts": response_array[0].replace('"', "")})
-        chat_history.append({"role": "model", "parts": response_array[1].replace('"', "")})
-        model_response = response_array[1]
+        chat_history.append({"role": "user", "parts": json_part[0]})
+        chat_history.append({"role": "model", "parts": json_part[1]})
+        model_response = json_part[1]
     except (SyntaxError, ValueError):
         print(SyntaxError, ValueError)
         model_response = "Try is broken"

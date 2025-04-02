@@ -14,3 +14,4 @@ wheels/
 
 # local environment variables
 *.env
+**/*.wav

@@ -1,11 +1,11 @@
 import google.generativeai as genai
 import base64
 import sounddevice as sd
-import keyboard
 import numpy as np
 import wave
 from dotenv import load_dotenv
 import os
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -95,26 +95,29 @@ def process_audio(filename):
 
     # Generate response
     response = model.generate_content(contents)
+    
 
     # Save conversation to history
     if isinstance(response.text, str):
-        print("str")
-        json_part = response.text.replace("json\n", "")
+        #print(response.text)
+        json_part = response.text.replace("```json\n", "").replace("```", "").replace("[", "").replace("]", "").replace("\n", "").replace('"', "")
+        print(json_part)
     try:
-        response_array = ast.literal_eval(json_part)
-        chat_history.append({"role": "user", "parts": response_array[0]})
-        chat_history.append({"role": "model", "parts": response_array[1]})
+        response_array = json_part.split(',')
+        print(response_array)
+        chat_history.append({"role": "user", "parts": response_array[0].replace('"', "")})
+        chat_history.append({"role": "model", "parts": response_array[1].replace('"', "")})
+        model_response = response_array[1]
     except (SyntaxError, ValueError):
-        print("Invalid format", )
+        print(SyntaxError, ValueError)
+        model_response = "Try is broken"
 
+   
     print("AI:", response.text)
+    os.popen(f"espeak \"{model_response}\"")
 
 # Loop to wait for the 'R' key press
 print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")
 while True:
-    if keyboard.is_pressed("r"):
         audio_file = record_audio()
         process_audio(audio_file)
-    elif keyboard.is_pressed("esc"):
-        print("\n👋 Exiting program.")
-        break

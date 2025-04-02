@@ -1,10 +1,10 @@
 import google.generativeai as genai
 import base64
 import sounddevice as sd
-import keyboard
 import numpy as np
 import wave
 from dotenv import load_dotenv
+from pynput import keyboard as pk
 import os
 
 # Load environment variables from .env file
@@ -82,12 +82,12 @@ def process_audio(filename):
             "parts": [
                 {
                     "inline_data": {
-                        "mime_type": "audio/mpeg",  # Correct MIME type for MP3
+                        "mime_type": "audio/mpeg",
                         "data": audio_base64,
                     }
                 },
                 {
-                    "text": system_instruction  # Optional text prompt
+                    "text": system_instruction
                 }
             ]
         }
@@ -102,12 +102,17 @@ def process_audio(filename):
 
     print("AI:", response.text)
 
-# Loop to wait for the 'R' key press
+# Listen for key events using pynput
+def on_press(key):
+    try:
+        if key.char == 'r':
+            audio_file = record_audio()
+            process_audio(audio_file)
+    except AttributeError:
+        if key == pk.Key.esc:
+            print("\n👋 Exiting program.")
+            return False
+
 print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")
-while True:
-    if keyboard.is_pressed("r"):
-        audio_file = record_audio()
-        process_audio(audio_file)
-    elif keyboard.is_pressed("esc"):
-        print("\n👋 Exiting program.")
-        break
+with pk.Listener(on_press=on_press) as listener:
+    listener.join()

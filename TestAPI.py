@@ -252,13 +252,11 @@ Based on the audio content and speech tone, extract the following features and r
 
 4. **Age_Group**: ["Child", "Adult", "Elderly"]
 
-5. **Speech_Duration**: Approximate in seconds
+5. **Tone**: ["Friendly", "Urgent", "Angry", "Confused", "Neutral"]
 
-6. **Tone**: ["Friendly", "Urgent", "Angry", "Confused", "Neutral"]
+6. **Keywords**: List important keywords detected
 
-7. **Keywords**: List important keywords detected
-
-8. **Outcome**: Describe what likely happened (e.g., successful delivery, no answer)
+7. **Outcome**: Describe what likely happened (e.g., successful delivery, no answer)
 
 Return the result as a JSON object.
 """

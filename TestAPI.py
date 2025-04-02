@@ -32,17 +32,22 @@ generation_config = {
 }
 
 system_instruction ="""
-  "For the progrom I need you to create array as a responce in this one array [**'Base64 audio input transcript to text of What is said in the audio'**, **'Responce of upcoming instruction'**]
 You are a front-door AI assistant. Your task is to identify the visitor's reason for coming 
 and provide relevant information.
+
 - If they ask for a specific person using the keywords **'Steve'** or **'Steven'**, notify the owner. 
   Otherwise, inform them that it’s the wrong house.
 - If it’s a delivery and the keywords like **'Grab'**, **'Lineman'**, or **'food'** are mentioned, instruct them to leave 
   the package on the table.
 - If they ask for contact information using the keywords like **'call'** or **'phone'**, provide the phone number: **077-7777777**.
+- If **no conversation is detected**, respond with this array:
+  `["", "__STOP__"]`
 
-Keep responses natural, concise, and polite. Respond in a calm and welcoming voice.
-**Respond in Thai language.**
+Keep responses natural, concise, and polite. Respond in a calm and welcoming voice.  
+**Respond in Thai language.**  
+
+Return the result as a single array:
+**[ 'Text of visitor is said in the audio', 'AI response in Thai or special token' ]**
         """
 
 
@@ -65,6 +70,7 @@ fs = 44100  # Sample rate
 silence_threshold = 10000  # Adjust as needed (lower = more sensitive)
 max_record_seconds = 5  # Prevent recording forever
 silence_duration = 2.0  # Seconds of silence before stopping
+first_recording = True  # Flag to check if it's the first recording
 
 def record_audio():
     """Records audio until the user stops talking."""
@@ -109,7 +115,33 @@ def record_audio():
         wf.setframerate(fs)
         wf.writeframes(audio_data.tobytes())
 
+
+    # Append this audio to long_record.wav
+    long_filename = "long_record.wav"
+    global first_recording
+    if not os.path.exists(long_filename) or first_recording:
+        first_recording = False
+        # If it doesn't exist yet, create it with headers
+        with wave.open(long_filename, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(fs)
+            wf.writeframes(audio_data.tobytes())
+    else:
+        # If it exists, append without overwriting header
+        with wave.open(long_filename, "rb") as original:
+            params = original.getparams()
+            old_data = original.readframes(original.getnframes())
+
+        with wave.open(long_filename, "wb") as wf:
+            wf.setparams(params)
+            wf.writeframes(old_data + audio_data.tobytes())
+    
     return wav_filename
+
+
+
+stop_found = 0
 
 def text_to_speech(text):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "iot-exploratory-2025-64d61984f617.json"
@@ -191,10 +223,79 @@ def process_audio(filename):
 
     print("Visitor:", json_part[0])
     print("AI:", model_response)
-    text_to_speech(model_response)
+    if(model_response == "__STOP__"):
+        global stop_found
+        stop_found +=1
+        text_to_speech("คุณยังอยู่ไหม")
+    else:
+        stop_found =0
+        text_to_speech(model_response)
     
-# Loop to wait for the 'R' key press
-#print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")
+    
+
+def analyze_long_record():
+    with open("long_record.wav", "rb") as audio_file:
+        audio_content = audio_file.read()
+
+    audio_base64 = base64.b64encode(audio_content).decode("utf-8")
+
+    visitor_analysis_prompt = """
+You are an AI assistant analyzing a voice recording from a front-door visitor. 
+Based on the audio content and speech tone, extract the following features and return them in JSON format:
+
+1. **Visitor_Type**: Classify into one of:
+   ["Delivery", "Friend", "Family", "Stranger", "Salesperson", "Neighbor", "Maintenance", "Solicitor"]
+
+2. **Urgency_Level**: One of ["Low", "Medium", "High"]
+
+3. **Gender**: ["Male", "Female", "Unknown"]
+
+4. **Age_Group**: ["Child", "Adult", "Elderly"]
+
+5. **Speech_Duration**: Approximate in seconds
+
+6. **Tone**: ["Friendly", "Urgent", "Angry", "Confused", "Neutral"]
+
+7. **Keywords**: List important keywords detected
+
+8. **Outcome**: Describe what likely happened (e.g., successful delivery, no answer)
+
+Return the result as a JSON object.
+"""
+
+    contents = [
+        {
+            "parts": [
+                {
+                    "inline_data": {
+                        "mime_type": "audio/mpeg",
+                        "data": audio_base64,
+                    }
+                },
+                {
+                    "text": visitor_analysis_prompt
+                }
+            ]
+        }
+    ]
+
+    response = model.generate_content(contents)
+
+    print("\n📊 Visitor Analysis:")
+    print(response.text)
+
+    # Try to pretty print JSON
+    try:
+        parsed = json.loads(response.text.replace("```json\n", "").replace("```", ""))
+        print(json.dumps(parsed, indent=2, ensure_ascii=False))
+    except Exception as e:
+        print("❌ Failed to parse response:", e)
+
 while True:
         audio_file = record_audio()
         process_audio(audio_file)
+        
+        if stop_found > 1:
+            break
+
+analyze_long_record()

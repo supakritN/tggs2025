@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 import json
 import re
+import subprocess
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,6 +29,7 @@ generation_config = {
 
 system_instruction = (
     "For the progrom I need you to create array as a responce in this one array [**'Base64 audio input transcript to text of What is said in the audio'**, **'Responce of upcoming instruction'**]"
+    "- If you don't understand the messege answer empty message."
     "You are a front-door AI assistant. Your task is to identify the visitor's reason for coming "
     "and provide relevant information. If recieve Thai messege, answer in English.\n"
     "- If they ask for a specific person using the keywords **'Steve'** or **'Steven'**, notify the owner. "
@@ -108,9 +110,10 @@ def process_audio(filename):
         print(SyntaxError, ValueError)
         model_response = "Try is broken"
 
-   
-    print("AI:", response.text)
-    os.popen(f"espeak \"{model_response}\"")
+    print("Visitor:", json_part[0])
+    print("AI:", model_response)
+    #os.popen(f"espeak \"{model_response}\"")
+    subprocess.run(f"espeak \"{model_response}\"", shell=True)
 
 # Loop to wait for the 'R' key press
 #print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")

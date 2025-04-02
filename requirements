@@ -1,2 +1,4 @@
 google.generativeai
 sounddevice
+google-cloud-texttospeech
+pyaudio

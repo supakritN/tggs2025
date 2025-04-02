@@ -6,6 +6,7 @@ import wave
 from dotenv import load_dotenv
 import os
 import json
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,7 +29,7 @@ generation_config = {
 system_instruction = (
     "For the progrom I need you to create array as a responce in this one array [**'Base64 audio input transcript to text of What is said in the audio'**, **'Responce of upcoming instruction'**]"
     "You are a front-door AI assistant. Your task is to identify the visitor's reason for coming "
-    "and provide relevant information.\n"
+    "and provide relevant information. If recieve Thai messege, answer in English.\n"
     "- If they ask for a specific person using the keywords **'Steve'** or **'Steven'**, notify the owner. "
     "Otherwise, inform them that it’s the wrong house.\n"
     "- If it’s a delivery and the keywords like **'Grab'** ,**'Lineman'**, or **'food'** are mentioned, instruct them to leave "
@@ -98,9 +99,7 @@ def process_audio(filename):
 
     # Save conversation to history
     if isinstance(response.text, str):
-        #print(response.text)
         json_part =  json.loads(response.text.replace("```json\n", "").replace("```", ""))
-        #print(json_part)
     try:
         chat_history.append({"role": "user", "parts": json_part[0]})
         chat_history.append({"role": "model", "parts": json_part[1]})
@@ -114,7 +113,7 @@ def process_audio(filename):
     os.popen(f"espeak \"{model_response}\"")
 
 # Loop to wait for the 'R' key press
-print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")
+#print("\n🔹 Press 'R' to record audio. Press 'ESC' to exit.")
 while True:
         audio_file = record_audio()
         process_audio(audio_file)

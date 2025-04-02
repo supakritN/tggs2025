@@ -15,3 +15,5 @@ wheels/
 # local environment variables
 *.env
 **/*.wav
+Espeak-ng-thai
+recorded_audio.wav

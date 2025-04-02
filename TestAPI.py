@@ -97,8 +97,15 @@ def process_audio(filename):
     response = model.generate_content(contents)
 
     # Save conversation to history
-    chat_history.append({"role": "user", "parts": contents})
-    chat_history.append({"role": "model", "parts": [response.text]})
+    if isinstance(response.text, str):
+        print("str")
+        json_part = response.text.replace("json\n", "")
+    try:
+        response_array = ast.literal_eval(json_part)
+        chat_history.append({"role": "user", "parts": response_array[0]})
+        chat_history.append({"role": "model", "parts": response_array[1]})
+    except (SyntaxError, ValueError):
+        print("Invalid format", )
 
     print("AI:", response.text)
 

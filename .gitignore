@@ -17,3 +17,5 @@ wheels/
 **/*.wav
 Espeak-ng-thai
 recorded_audio.wav
+
+*.json

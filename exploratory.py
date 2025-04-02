@@ -37,7 +37,7 @@ and provide relevant information.
 - If they ask for contact information using the keywords like **'call'** or **'phone'**, provide the phone number: **077-7777777**.
 
 Keep responses natural, concise, and polite. Respond in a calm and welcoming voice.
-**Respond in the same as the question language.**
+**Respond in Thai or English language.**
         """
 
 
@@ -56,8 +56,10 @@ chat_session = model.start_chat(history=chat_history)
 # Audio Recording Settings
 fs = 44100  # Sample rate
 silence_threshold = 500  # Adjust as needed (lower = more sensitive)
-silence_seconds = 3
-session_seconds = 9  # Timeout duration in seconds
+silence_seconds = 2
+session_seconds = 5  # Timeout duration in seconds
+
+first_recording=True
 
 # ------------------- Alert Sound --------------------
 def play_alert_sound(alert_type="listening"):
@@ -147,7 +149,30 @@ def save_wav(audio_data, filename="recorded_audio.wav"):
         wf.setsampwidth(2)
         wf.setframerate(fs)
         wf.writeframes(audio_data.tobytes())
-    return filename
+
+    if filename=="visitor_message.wav":
+        # Append this audio to long_record.wav
+        long_filename = "long_record.wav"
+        global first_recording
+        if not os.path.exists(long_filename) or first_recording:
+            first_recording = False
+            # If it doesn't exist yet, create it with headers
+            with wave.open(long_filename, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(fs)
+                wf.writeframes(audio_data.tobytes())
+        else:
+            # If it exists, append without overwriting header
+            with wave.open(long_filename, "rb") as original:
+                params = original.getparams()
+                old_data = original.readframes(original.getnframes())
+
+            with wave.open(long_filename, "wb") as wf:
+                wf.setparams(params)
+                wf.writeframes(old_data + audio_data.tobytes())
+        return filename
+
 
 def check_for_trigger(filename):
     with open(filename, "rb") as audio_file:
@@ -257,6 +282,61 @@ def text_to_speech(text):
     stream.close()
     p.terminate()
 
+def analyze_long_record():
+    with open("long_record.wav", "rb") as audio_file:
+        audio_content = audio_file.read()
+
+    audio_base64 = base64.b64encode(audio_content).decode("utf-8")
+
+    visitor_analysis_prompt = """
+You are an AI assistant analyzing a voice recording from a front-door visitor. 
+Based on the audio content and speech tone, extract the following features and return them in JSON format:
+
+1. **Visitor_Type**: Classify into one of:
+   ["Delivery", "Friend", "Family", "Stranger", "Salesperson", "Neighbor", "Maintenance", "Solicitor"]
+
+2. **Urgency_Level**: One of ["Low", "Medium", "High"]
+
+3. **Gender**: ["Male", "Female", "Unknown"]
+
+4. **Age_Group**: ["Child", "Adult", "Elderly"]
+
+5. **Tone**: ["Friendly", "Urgent", "Angry", "Confused", "Neutral"]
+
+6. **Keywords**: List important keywords detected
+
+7. **Outcome**: Describe what likely happened (e.g., successful delivery, no answer)
+
+Return the result as a JSON object.
+"""
+
+    contents = [
+        {
+            "parts": [
+                {
+                    "inline_data": {
+                        "mime_type": "audio/mpeg",
+                        "data": audio_base64,
+                    }
+                },
+                {
+                    "text": visitor_analysis_prompt
+                }
+            ]
+        }
+    ]
+
+    response = model.generate_content(contents)
+
+    print("\n📊 Visitor Analysis:")
+    print(response.text)
+
+    # Try to pretty print JSON
+    try:
+        parsed = json.loads(response.text.replace("```json\n", "").replace("```", ""))
+        print(json.dumps(parsed, indent=2, ensure_ascii=False))
+    except Exception as e:
+        print("❌ Failed to parse response:", e)
 
 # ------------------- Main Loop ----------------------
 
@@ -277,6 +357,7 @@ try:
             visitor_audio = record_until_silence()
             if visitor_audio is None:
                 hello_flag=False
+                analyze_long_record()
                 continue
             visitor_wav = save_wav(visitor_audio, filename="visitor_message.wav")
             process_audio(visitor_wav)

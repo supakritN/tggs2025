@@ -37,7 +37,7 @@ and provide relevant information.
 - If they ask for contact information using the keywords like **'call'** or **'phone'**, provide the phone number: **077-7777777**.
 
 Keep responses natural, concise, and polite. Respond in a calm and welcoming voice.
-**Respond in Thai language.**
+**Respond in the same as the question language.**
         """
 
 
@@ -55,9 +55,9 @@ chat_session = model.start_chat(history=chat_history)
 
 # Audio Recording Settings
 fs = 44100  # Sample rate
-silence_threshold = 200  # Adjust as needed (lower = more sensitive)
+silence_threshold = 500  # Adjust as needed (lower = more sensitive)
 silence_seconds = 3
-max_inactivity_seconds = 10  # Timeout duration in seconds
+session_seconds = 9  # Timeout duration in seconds
 
 # ------------------- Alert Sound --------------------
 def play_alert_sound(alert_type="listening"):
@@ -106,21 +106,35 @@ def record_with_silence_detection(max_record_time=2):
 
 def record_until_silence():
     play_alert_sound("listening")
-    print("🟣 Recording visitor message (it will stop when silent for 3s)...")
+    print(f"🟣 Recording visitor message (it will stop when silent for {silence_seconds}s)...")
     frames = []
     silence_counter = 0
     chunk_duration = 0.5
+
+    leave_flag = True
 
     while True:
         chunk = sd.rec(int(chunk_duration * fs), samplerate=fs, channels=1, dtype=np.int16)
         sd.wait()
         frames.append(chunk)
 
+
         if is_silent(chunk):
             silence_counter += chunk_duration
         else:
             silence_counter = 0
+            leave_flag = False
 
+        if silence_counter * -1 > session_seconds:
+            print(f"No interaction for {session_seconds} seconds, clearing session.\n")
+            chat_history.clear()
+            return None
+
+        if leave_flag:
+            silence_counter -= chunk_duration*2
+            continue
+
+        print(silence_counter, silence_seconds)
         if silence_counter >= silence_seconds:
             break
 
@@ -201,7 +215,7 @@ def process_audio(filename):
     print("Visitor: ", json_part[0])
     print("AI     : ", json_part[1])
     text_to_speech(json_part[1])
-    last_interaction_time = time.time()
+    return time.time()
     #subprocess.run(f'espeak "{json_part[1]}"', shell=True)
 
 def text_to_speech(text):
@@ -243,6 +257,7 @@ def text_to_speech(text):
     stream.close()
     p.terminate()
 
+
 # ------------------- Main Loop ----------------------
 
 last_interaction_time = time.time()
@@ -260,15 +275,11 @@ try:
             # Phase 2 - Real recording
             print("✅ Trigger detected! Start recording visitor message.\n")
             visitor_audio = record_until_silence()
+            if visitor_audio is None:
+                hello_flag=False
+                continue
             visitor_wav = save_wav(visitor_audio, filename="visitor_message.wav")
             process_audio(visitor_wav)
-            last_interaction_time = time.time()
-            print(time.time() - last_interaction_time, max_inactivity_seconds)
-            if time.time() - last_interaction_time > max_inactivity_seconds:
-                print("No interaction for 10 seconds, clearing session.\n")
-                hello_flag=False
-                chat_history.clear()
-                last_interaction_time = time.time()  # Reset the timer for the next cycle
 
 except KeyboardInterrupt:
     print("\nShutting down gracefully...")
